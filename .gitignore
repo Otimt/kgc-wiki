@@ -1,0 +1,5 @@
+
+files/*
+.idea/*
+tools/node_modules
+
