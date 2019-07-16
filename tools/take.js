@@ -67,30 +67,29 @@ function saveFileByUrl(orgiURL,type,text){
 	//文件名
 	var fileName = urlTextArr.pop();
 	if(!fileName.match(/\.html$/)){
-		fileName += ".html";
+		fileName += "."+type;
 		console.log("准备创建文件，文件名："+fileName)
 	}
 	var domainStr = urlTextArr.shift();//域名
 	var folder = "../files/" + domainStr + "/" + type + "/" +urlTextArr.join("/");
 
 	var filePath = folder+"/"+fileName;
-	if (!fs.existsSync(filePath)){
+	if (true){
+	// if (!fs.existsSync(filePath)){
 		console.log(filePath+"文件不存在，写入");
 		createFolderSync(folder);
 		//todo gbk 转码 utf-8
 		var decodeText = transcodingToUtf8(text);
-		var $ =  cheerio.load(text);
+		if(type=="html"){
+			var $ =  cheerio.load(text);
 
-		//todo 保存css
-		$ = saveCssFile($,orgiURL)
-
-
-
-		$('body').append('Hello there!');
-
-
-
-		fs.writeFileSync(filePath,$.html());
+			//todo 保存css
+			$ = saveCssFile($,orgiURL);
+			$('body').append('Hello there!');
+			fs.writeFileSync(filePath,$.html());
+		}else{
+			fs.writeFileSync(filePath,text);
+		}
 	}else{
 		console.log(filePath+"文件已存在");
 	}
@@ -109,13 +108,27 @@ function transcodingToUtf8(text){
 /**
  * 保存css 文件,并替换link中链接
  * @param $
- * @param orgiURL
+ * @param orgiHtmlURL
  */
-function saveCssFile($,orgiURL){
-	// var $linkList = $("link");
-	// for(var i=0,il=$linkList.length;i<il;i++){
-	// 	var $link = $linkList.eq(i);
-	// 	var orgHref = $link.attr("href");
+function saveCssFile($,orgiHtmlURL){
+	// let linkReg = /<link.*?>/g;
+	// let imgReg = /<image.*?>/g;
+	// let scriptReg = /<script.*?>/g;
+	// let styleReg = /<style.*?>.*?<\/style>/g;
+
+
+
+	let $linkList = $("link[type='text/css']");
+	let from = url.parse(orgiHtmlURL);
+	for(var i=0,il=$linkList.length;i<il;i++){
+		var $link = $linkList.eq(i);
+		var orgHref = $link.attr("href");
+		let orgiURL = from.resolve(orgHref);
+		getTextByUrl(orgiURL,function(orgiURL,text){
+			console.log("css获取完毕");
+			//文件夹
+			saveFileByUrl(orgiURL,"css",text);
+		});
 	// 	var newHref = "";
 	// 	if(orgHref.indexOf("/") == 0){
 	// 		newHref = orgiURL.spilt("/").slice(0,4).join("/") + orgHref;
@@ -125,7 +138,8 @@ function saveCssFile($,orgiURL){
 	// 		newHref = orgHref
 	// 	}
 	// 	console.log(orgHref + " => " + newHref);
-	// }
+		console.log(orgHref + " => ");
+	}
 	return $;
 }
 
