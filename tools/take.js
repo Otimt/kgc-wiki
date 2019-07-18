@@ -1,4 +1,5 @@
 let cheerio = require('cheerio');
+var request = require('request');
 let iconv = require("iconv-lite");
 let path = require("path");
 let http = require('http');
@@ -124,37 +125,39 @@ function transcodingToUtf8(text){
  * @param orgiHtmlURL
  */
 function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
-
 	let $linkList = $("link[rel='stylesheet'],img,script[src]");
 
 	let from = url.parse(orgiHtmlURL),
 		htmlFileDir = path.basename(htmlFilePathStr)
 	for(let i=0,il=$linkList.length;i<il;i++){
 		let $link = $linkList.eq(i),
-			orgHref,type;
+			type,linkAttrStr;
 		//取得原始路径
 		var label = $link[0].tagName.toLowerCase();
 		console.log( label )
         if(label == "link" ){
-			orgHref = $link.attr("href");
 			type = "css";
+			linkAttrStr = "href";
 		}else if(label == "img" ){
-			orgHref = $link.attr("src");
 			type = "img";
+			linkAttrStr = "src";
 		}else{
-			orgHref = $link.attr("src");
 			type = "js";
+			linkAttrStr = "src";
 		}
-
+		let orgHref = $link.attr(linkAttrStr);
 		let absURL = from.resolve(orgHref);//转化为绝对路径
 		let filePathStr = countPathByUrl(absURL, type);//文件保存地址
 		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
 		console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
-		$link.attr("href",relaUrl);
-		getTextByUrl(absURL,function(orgiURL,text){
-			console.log("css获取完毕");
-			var filePath = saveFileByUrl(orgiURL,"css",text);
-		});
+		$link.attr(linkAttrStr,relaUrl);
+		// getTextByUrl(absURL,function(orgiURL,text){
+		// 	console.log("css获取完毕");
+		// 	var filePath = saveFileByUrl(orgiURL,type,text);
+		// });
+		downloadFile(absURL,filePathStr,()=>{
+			console.log(filePathStr+"保存完毕");
+		})
 		console.log(orgHref + " => " + filePathStr);
 	}
 	return $;
@@ -197,4 +200,14 @@ function getTextByUrl(orgiUrlStr, endHanddle){
 			endHanddle(orgiUrlStr,text);
 		})
 	}
+}
+
+/*
+ * url 网络文件地址
+ * @filename 文件名
+ * @callback 回调函数
+ */
+function downloadFile(uri,filename,callback){
+	var stream = fs.createWriteStream(filename);
+	request(uri).pipe(stream).on('close', callback);
 }
