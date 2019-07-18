@@ -12,12 +12,6 @@ console.log(target);
 
 loopPointList(pointList);
 
-// {
-// 	pointIndex:0,
-// 	urlIndex:0,
-// 	url:"balabala"
-// }
-
 /**
  * 遍历 知识点数组，生成待处理队列
  * @param pointList
@@ -143,10 +137,10 @@ function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 		let orgHref = $link.attr(linkAttrStr);
 		let absURL = from.resolve(orgHref);//转化为绝对路径
 		let filePathStr = countPathByUrl(absURL, type);//文件保存地址
+		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
+		console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
+		$link.attr(linkAttrStr,relaUrl);
 		if (!fs.existsSync(filePathStr)){
-			let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
-			console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
-			$link.attr(linkAttrStr,relaUrl);
 			var folder = path.dirname(filePathStr);
 			createFolderSync(folder);//检查文件夹是否存在
 			downloadFile(absURL,filePathStr,()=>{
