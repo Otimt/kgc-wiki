@@ -81,28 +81,23 @@ function countPathByUrl(orgiURL, type) {
 function saveFileByUrl(orgiURL,type,text){
 	var filePathStr = countPathByUrl(orgiURL, type);
     var folder = path.dirname(filePathStr);
-	if (true){
-	// if (!fs.existsSync(filePath)){
-		console.log(filePathStr+"文件不存在，写入");
-		createFolderSync(folder);
-		//todo gbk 转码 utf-8
-		let decodeText = transcodingToUtf8(text);
-		if(type=="html"){
-			let $ =  cheerio.load(text);
 
-			//保存css js img
-			$ = saveCssJsImgFile({
-				$:$,
-				orgiHtmlURL:orgiURL,
-				htmlFilePathStr:filePathStr
-			});
-			$('body').append('Hello there!');
-			fs.writeFileSync(filePathStr,$.html());
-		}else{
-			fs.writeFileSync(filePathStr,text);
-		}
+	createFolderSync(folder);//检查文件夹是否存在
+	//todo gbk 转码 utf-8
+	let decodeText = transcodingToUtf8(text);
+	if(type=="html"){
+		let $ =  cheerio.load(text);
+
+		//保存css js img
+		$ = saveCssJsImgFile({
+			$:$,
+			orgiHtmlURL:orgiURL,
+			htmlFilePathStr:filePathStr
+		});
+		$('body').append('Hello there!');
+		fs.writeFileSync(filePathStr,$.html());
 	}else{
-		console.log(filePathStr+"文件已存在");
+		fs.writeFileSync(filePathStr,text);
 	}
 	return filePathStr;
 }
@@ -148,17 +143,20 @@ function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 		let orgHref = $link.attr(linkAttrStr);
 		let absURL = from.resolve(orgHref);//转化为绝对路径
 		let filePathStr = countPathByUrl(absURL, type);//文件保存地址
-		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
-		console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
-		$link.attr(linkAttrStr,relaUrl);
-		// getTextByUrl(absURL,function(orgiURL,text){
-		// 	console.log("css获取完毕");
-		// 	var filePath = saveFileByUrl(orgiURL,type,text);
-		// });
-		downloadFile(absURL,filePathStr,()=>{
-			console.log(filePathStr+"保存完毕");
-		})
-		console.log(orgHref + " => " + filePathStr);
+		if (!fs.existsSync(filePathStr)){
+			let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
+			console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
+			$link.attr(linkAttrStr,relaUrl);
+			var folder = path.dirname(filePathStr);
+			createFolderSync(folder);//检查文件夹是否存在
+			downloadFile(absURL,filePathStr,()=>{
+				console.log(filePathStr+"保存完毕");
+			})
+			console.log(orgHref + " => " + filePathStr);
+		}else{
+			console.log(orgHref + " => " + filePathStr+"已存在");
+		}
+
 	}
 	return $;
 }
