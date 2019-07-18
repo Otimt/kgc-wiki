@@ -62,9 +62,9 @@ function countPathByUrl(orgiURL, type) {
 	let fileName = urlTextArr.pop();
 	let regex = new RegExp("\." + type + "$");
 	if (!fileName.match(regex)){
-            fileName += "."+type;
-            console.log("准备创建文件，文件名："+fileName)
-        }
+		fileName += "."+type;
+	}
+	console.log(orgiURL+"准备创建文件，文件名："+fileName)
 	let domainStr = urlTextArr.shift();//域名
 	let folder = "../files/" + domainStr + "/" + type + "/" + urlTextArr.join("/");
 
@@ -89,7 +89,11 @@ function saveFileByUrl(orgiURL,type,text){
 			let $ =  cheerio.load(text);
 
 			//todo 保存css
-			$ = saveCssFile($,orgiURL);
+			$ = saveCssFile({
+				$:$,
+				orgiHtmlURL:orgiURL,
+				htmlFilePathStr:filePathStr
+			});
 			$('body').append('Hello there!');
 			fs.writeFileSync(filePathStr,$.html());
 		}else{
@@ -116,48 +120,28 @@ function transcodingToUtf8(text){
  * @param $
  * @param orgiHtmlURL
  */
-function saveCssFile($,orgiHtmlURL){
-	// let linkReg = /<link.*?>/g;
-	// let imgReg = /<image.*?>/g;
-	// let scriptReg = /<script.*?>/g;
-	// let styleReg = /<style.*?>.*?<\/style>/g;
-
-	let fileReplaceList = [];
+function saveCssFile({$,orgiHtmlURL,htmlFilePathStr}){
 
 	let $linkList = $("link[rel='stylesheet']");
 	let $imgList = $("img");
 	let $jsList = $("link[rel='stylesheet']");
-	// let $styleImgList = $("link[rel='stylesheet']");
 
-	let fileMap = new Map();
-
-
-	let from = url.parse(orgiHtmlURL);
+	let from = url.parse(orgiHtmlURL),
+		htmlFileDir = path.basename(htmlFilePathStr)
 	for(let i=0,il=$linkList.length;i<il;i++){
 		let $link = $linkList.eq(i);
 		let orgHref = $link.attr("href");//原始路径
 		let absURL = from.resolve(orgHref);//转化为绝对路径
 		let filePathStr = countPathByUrl(absURL, "css");//文件保存地址
-		let obj = {};
-		obj[orgHref] = filePathStr;
-		fileReplaceList.push(obj);
+		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
+		console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
+		$link.attr("href",relaUrl);
 		getTextByUrl(absURL,function(orgiURL,text){
 			console.log("css获取完毕");
-			//文件夹
 			var filePath = saveFileByUrl(orgiURL,"css",text);
 		});
-	// 	let newHref = "";
-	// 	if(orgHref.indexOf("/") == 0){
-	// 		newHref = orgiURL.spilt("/").slice(0,4).join("/") + orgHref;
-	// 	}else if(orgHref.indexOf("http")){
-	// 		newHref = orgHref
-	// 	}else{
-	// 		newHref = orgHref
-	// 	}
-	// 	console.log(orgHref + " => " + newHref);
 		console.log(orgHref + " => " + filePathStr);
 	}
-	console.log(fileReplaceList)
 	return $;
 }
 
