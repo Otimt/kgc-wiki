@@ -2,6 +2,7 @@ let cheerio = require('cheerio');
 let iconv = require("iconv-lite");
 let path = require("path");
 let http = require('http');
+var https = require('https');
 let url = require('url');
 let fs = require("fs");
 let target = require('./target.js');
@@ -59,9 +60,9 @@ function processQueue(pendingURLQueue){
 function countPathByUrl(orgiURL, type) {
 	let urlTextArr = orgiURL.replace("http://", "").replace("https://", "").split("/");
 	//文件名
-	let fileName = urlTextArr.pop();
+	let fileName = urlTextArr.pop().replace(/\?.*$/,"");
 	let regex = new RegExp("\." + type + "$");
-	if (!fileName.match(regex)){
+	if (type!="img" &&  !fileName.match(regex)){
 		fileName += "."+type;
 	}
 	console.log(orgiURL+"准备创建文件，文件名："+fileName)
@@ -88,8 +89,8 @@ function saveFileByUrl(orgiURL,type,text){
 		if(type=="html"){
 			let $ =  cheerio.load(text);
 
-			//todo 保存css
-			$ = saveCssFile({
+			//保存css js img
+			$ = saveCssJsImgFile({
 				$:$,
 				orgiHtmlURL:orgiURL,
 				htmlFilePathStr:filePathStr
@@ -110,7 +111,9 @@ function saveFileByUrl(orgiURL,type,text){
  * @returns {*}
  */
 function transcodingToUtf8(text){
-	return text;
+	// 把数组转换为gbk中文
+	var texts = iconv.decode(text, 'utf-8');
+	return texts;
 }
 
 
@@ -120,19 +123,31 @@ function transcodingToUtf8(text){
  * @param $
  * @param orgiHtmlURL
  */
-function saveCssFile({$,orgiHtmlURL,htmlFilePathStr}){
+function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 
-	let $linkList = $("link[rel='stylesheet']");
-	let $imgList = $("img");
-	let $jsList = $("link[rel='stylesheet']");
+	let $linkList = $("link[rel='stylesheet'],img,script[src]");
 
 	let from = url.parse(orgiHtmlURL),
 		htmlFileDir = path.basename(htmlFilePathStr)
 	for(let i=0,il=$linkList.length;i<il;i++){
-		let $link = $linkList.eq(i);
-		let orgHref = $link.attr("href");//原始路径
+		let $link = $linkList.eq(i),
+			orgHref,type;
+		//取得原始路径
+		var label = $link[0].tagName.toLowerCase();
+		console.log( label )
+        if(label == "link" ){
+			orgHref = $link.attr("href");
+			type = "css";
+		}else if(label == "img" ){
+			orgHref = $link.attr("src");
+			type = "img";
+		}else{
+			orgHref = $link.attr("src");
+			type = "js";
+		}
+
 		let absURL = from.resolve(orgHref);//转化为绝对路径
-		let filePathStr = countPathByUrl(absURL, "css");//文件保存地址
+		let filePathStr = countPathByUrl(absURL, type);//文件保存地址
 		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
 		console.log( htmlFilePathStr+"内的"+filePathStr+"替换为"+relaUrl )
 		$link.attr("href",relaUrl);
@@ -162,12 +177,16 @@ function createFolderSync(dirname) {
 }
 /**
  * 加载远程文本
- * @param orgiURL
+ * @param orgiUrlStr
  * @param endHanddle
  */
-function getTextByUrl(orgiURL, endHanddle){
-	console.log("正在加载"+orgiURL);
-	http.get( url.parse(orgiURL), function(res){
+function getTextByUrl(orgiUrlStr, endHanddle){
+	console.log("正在加载"+orgiUrlStr);
+	let orgiUrl = url.parse(orgiUrlStr),
+		httProtocol = (orgiUrl.protocol == 'https:' ? https : http);
+	httProtocol.get( orgiUrlStr, fileGetSuccessHandle);
+
+	function fileGetSuccessHandle(res){
 		let text = ''
 		res.on('data',function(chunk){
 			text += chunk;
@@ -175,7 +194,7 @@ function getTextByUrl(orgiURL, endHanddle){
 		res.on('end',function(){
 			console.log('spider_end && do cb');
 			// console.log(d);
-			endHanddle(orgiURL,text);
+			endHanddle(orgiUrlStr,text);
 		})
-	});
+	}
 }
