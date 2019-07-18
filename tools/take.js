@@ -1,11 +1,11 @@
-var cheerio = require('cheerio');
-var iconv = require("iconv-lite");
-var path = require("path");
-var http = require('http');
-var url = require('url');
-var fs = require("fs");
-var target = require('./target.js');
-var pointList = target.pointList;
+let cheerio = require('cheerio');
+let iconv = require("iconv-lite");
+let path = require("path");
+let http = require('http');
+let url = require('url');
+let fs = require("fs");
+let target = require('./target.js');
+let pointList = target.pointList;
 console.log(target);
 
 loopPointList(pointList);
@@ -21,14 +21,14 @@ loopPointList(pointList);
  * @param pointList
  */
 function loopPointList(pointList){
-	var pendingURLQueue = [];
-	for(var i=0,il=pointList.length;i<il;i++){
-		var pointObj = pointList[i];
-		var urlList = pointObj.urlList;
-		for(var j=0,jl=urlList.length;j<jl;j++){
-			var urlObj = urlList[j];
-			var orgiURL = urlObj.orgiURL;
-			var pendingURLObj = {
+	let pendingURLQueue = [];
+	for(let i=0,il=pointList.length;i<il;i++){
+		let pointObj = pointList[i];
+		let urlList = pointObj.urlList;
+		for(let j=0,jl=urlList.length;j<jl;j++){
+			let urlObj = urlList[j];
+			let orgiURL = urlObj.orgiURL;
+			let pendingURLObj = {
 				pointIndex:i,
 				urlIndex:j,
 				orgiURL:orgiURL,
@@ -46,7 +46,7 @@ function loopPointList(pointList){
 function processQueue(pendingURLQueue){
 	if(pendingURLQueue.length > 0){
 		console.log("正在处理队列,pendingURLQueue长度："+pendingURLQueue.length);
-		var pendingURLObj = pendingURLQueue.shift();
+		let pendingURLObj = pendingURLQueue.shift();
 		getTextByUrl(pendingURLObj.orgiURL,function(orgiURL,text){
 			console.log("执行完毕");
 			//文件夹
@@ -56,43 +56,49 @@ function processQueue(pendingURLQueue){
 	}
 }
 
+function countPathByUrl(orgiURL, type) {
+	let urlTextArr = orgiURL.replace("http://", "").replace("https://", "").split("/");
+	//文件名
+	let fileName = urlTextArr.pop();
+	let regex = new RegExp("\." + type + "$");
+	if (!fileName.match(regex)){
+            fileName += "."+type;
+            console.log("准备创建文件，文件名："+fileName)
+        }
+	let domainStr = urlTextArr.shift();//域名
+	let folder = "../files/" + domainStr + "/" + type + "/" + urlTextArr.join("/");
+
+	let filePathStr = folder + "/" + fileName;
+	return filePathStr;
+}
 /**
  * 根据url保存文件，文件名为网站原路由 最后一段
  * @param orgiURL
  * @param text
  */
 function saveFileByUrl(orgiURL,type,text){
-
-	var urlTextArr = orgiURL.replace("http://", "").replace("https://", "").split("/");
-	//文件名
-	var fileName = urlTextArr.pop();
-	if(!fileName.match(/\.html$/)){
-		fileName += "."+type;
-		console.log("准备创建文件，文件名："+fileName)
-	}
-	var domainStr = urlTextArr.shift();//域名
-	var folder = "../files/" + domainStr + "/" + type + "/" +urlTextArr.join("/");
-
-	var filePath = folder+"/"+fileName;
+	var filePathStr = countPathByUrl(orgiURL, type);
+    var folder = path.dirname(filePathStr);
 	if (true){
 	// if (!fs.existsSync(filePath)){
-		console.log(filePath+"文件不存在，写入");
+		console.log(filePathStr+"文件不存在，写入");
 		createFolderSync(folder);
 		//todo gbk 转码 utf-8
-		var decodeText = transcodingToUtf8(text);
+		let decodeText = transcodingToUtf8(text);
 		if(type=="html"){
-			var $ =  cheerio.load(text);
+			let $ =  cheerio.load(text);
 
 			//todo 保存css
 			$ = saveCssFile($,orgiURL);
 			$('body').append('Hello there!');
-			fs.writeFileSync(filePath,$.html());
+			fs.writeFileSync(filePathStr,$.html());
 		}else{
-			fs.writeFileSync(filePath,text);
+			fs.writeFileSync(filePathStr,text);
 		}
 	}else{
-		console.log(filePath+"文件已存在");
+		console.log(filePathStr+"文件已存在");
 	}
+	return filePathStr;
 }
 /**
  * gbk 转码 utf-8
@@ -116,20 +122,31 @@ function saveCssFile($,orgiHtmlURL){
 	// let scriptReg = /<script.*?>/g;
 	// let styleReg = /<style.*?>.*?<\/style>/g;
 
+	let fileReplaceList = [];
+
+	let $linkList = $("link[rel='stylesheet']");
+	let $imgList = $("img");
+	let $jsList = $("link[rel='stylesheet']");
+	// let $styleImgList = $("link[rel='stylesheet']");
+
+	let fileMap = new Map();
 
 
-	let $linkList = $("link[type='text/css']");
 	let from = url.parse(orgiHtmlURL);
-	for(var i=0,il=$linkList.length;i<il;i++){
-		var $link = $linkList.eq(i);
-		var orgHref = $link.attr("href");
-		let orgiURL = from.resolve(orgHref);
-		getTextByUrl(orgiURL,function(orgiURL,text){
+	for(let i=0,il=$linkList.length;i<il;i++){
+		let $link = $linkList.eq(i);
+		let orgHref = $link.attr("href");//原始路径
+		let absURL = from.resolve(orgHref);//转化为绝对路径
+		let filePathStr = countPathByUrl(absURL, "css");//文件保存地址
+		let obj = {};
+		obj[orgHref] = filePathStr;
+		fileReplaceList.push(obj);
+		getTextByUrl(absURL,function(orgiURL,text){
 			console.log("css获取完毕");
 			//文件夹
-			saveFileByUrl(orgiURL,"css",text);
+			var filePath = saveFileByUrl(orgiURL,"css",text);
 		});
-	// 	var newHref = "";
+	// 	let newHref = "";
 	// 	if(orgHref.indexOf("/") == 0){
 	// 		newHref = orgiURL.spilt("/").slice(0,4).join("/") + orgHref;
 	// 	}else if(orgHref.indexOf("http")){
@@ -138,8 +155,9 @@ function saveCssFile($,orgiHtmlURL){
 	// 		newHref = orgHref
 	// 	}
 	// 	console.log(orgHref + " => " + newHref);
-		console.log(orgHref + " => ");
+		console.log(orgHref + " => " + filePathStr);
 	}
+	console.log(fileReplaceList)
 	return $;
 }
 
@@ -166,7 +184,7 @@ function createFolderSync(dirname) {
 function getTextByUrl(orgiURL, endHanddle){
 	console.log("正在加载"+orgiURL);
 	http.get( url.parse(orgiURL), function(res){
-		var text = ''
+		let text = ''
 		res.on('data',function(chunk){
 			text += chunk;
 		})
