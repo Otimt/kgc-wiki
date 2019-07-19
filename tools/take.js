@@ -1,37 +1,46 @@
-let cheerio = require('cheerio');
-var request = require('request');
-let iconv = require("iconv-lite");
-let path = require("path");
-let http = require('http');
-var https = require('https');
-let url = require('url');
-let fs = require("fs");
-let target = require('./target.js');
-let pointList = target.pointList;
+let cheerio = require('cheerio'),
+	request = require('request'),
+	iconv = require("iconv-lite"),
+	path = require("path"),
+	http = require('http'),
+	https = require('https'),
+	url = require('url'),
+	fs = require("fs");
+// let target = require('./target.js'),
+// 	pointList = target.pointList;
 
-loopPointList(pointList);
+
+//loopPointList(pointList);
+main();
+
+function main(){
+	let targetStr = fs.readFileSync('./target-demo.txt','utf-8'),
+		pendingURLQueue = createPointList(targetStr);
+	processQueue(pendingURLQueue);
+
+}
 
 /**
  * 遍历 知识点数组，生成待处理队列
  * @param pointList
  */
-function loopPointList(pointList){
+function createPointList(targetStr){
+	console.log( targetStr );
+	let reg = /.*/g,
+		pointStrArr = targetStr.match(reg);
 	let pendingURLQueue = [];
-	for(let i=0,il=pointList.length;i<il;i++){
-		let pointObj = pointList[i];
-		let urlList = pointObj.urlList;
-		for(let j=0,jl=urlList.length;j<jl;j++){
-			let urlObj = urlList[j];
-			let orgiURL = urlObj.orgiURL;
-			let pendingURLObj = {
+	for(let i=0,il=pointStrArr.length;i<il;i++){
+		let pointStr = pointStrArr[i],
+			pointInfoArr = pointStr.split("	"),
+			pendingURLObj = {
 				pointIndex:i,
-				urlIndex:j,
-				orgiURL:orgiURL,
+				orgiURL:pointInfoArr[7],
 			};
+		if(pointInfoArr[7] && (pointInfoArr[7].indexOf("http://")==0 || pointInfoArr[7].indexOf("https://")==0)){
 			pendingURLQueue.push(pendingURLObj);
 		}
 	}
-	processQueue(pendingURLQueue);
+	return pendingURLQueue;
 }
 
 /**
@@ -125,6 +134,10 @@ function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 			linkAttrStr = "src";
 		}
 		let orgHref = $link.attr(linkAttrStr);
+		if(!orgHref || orgHref.indexOf("data:image")==0){
+			//orgHref不存在 或 是base64图片 不能保存
+			continue;
+		}
 		let absURL = from.resolve(orgHref);//转化为绝对路径
 		let filePathStr = countPathByUrl(absURL, type);//文件保存地址
 		let relaUrl = path.relative(htmlFilePathStr,filePathStr).replace("..\\","")
@@ -136,6 +149,7 @@ function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 			downloadFile(absURL,filePathStr,()=>{
 				console.log(filePathStr+"保存完毕 => " + filePathStr);
 			})
+			//todo 保存css里的图片
 		}else{
 			console.log(orgHref + " => " + filePathStr+"已存在 => " + filePathStr);
 		}
