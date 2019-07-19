@@ -8,7 +8,6 @@ let url = require('url');
 let fs = require("fs");
 let target = require('./target.js');
 let pointList = target.pointList;
-console.log(target);
 
 loopPointList(pointList);
 
@@ -77,33 +76,24 @@ function saveFileByUrl(orgiURL,type,text){
     var folder = path.dirname(filePathStr);
 
 	createFolderSync(folder);//检查文件夹是否存在
-	//todo gbk 转码 utf-8
-	let decodeText = transcodingToUtf8(text);
 	if(type=="html"){
-		let $ =  cheerio.load(text);
-
+		let $ =  cheerio.load(text,{
+			// decodeEntities: false
+		});
 		//保存css js img
 		$ = saveCssJsImgFile({
 			$:$,
 			orgiHtmlURL:orgiURL,
 			htmlFilePathStr:filePathStr
 		});
+		$('meta[charset]').attr('charset',"utf-8")
 		$('body').append('Hello there!');
-		fs.writeFileSync(filePathStr,$.html());
+		let outStr = $.html();
+		fs.writeFileSync(filePathStr,outStr,'utf8');
 	}else{
-		fs.writeFileSync(filePathStr,text);
+		fs.writeFileSync(filePathStr,text,'utf8');
 	}
 	return filePathStr;
-}
-/**
- * gbk 转码 utf-8
- * @param text
- * @returns {*}
- */
-function transcodingToUtf8(text){
-	// 把数组转换为gbk中文
-	var texts = iconv.decode(text, 'utf-8');
-	return texts;
 }
 
 
@@ -144,13 +134,11 @@ function saveCssJsImgFile({$,orgiHtmlURL,htmlFilePathStr}){
 			var folder = path.dirname(filePathStr);
 			createFolderSync(folder);//检查文件夹是否存在
 			downloadFile(absURL,filePathStr,()=>{
-				console.log(filePathStr+"保存完毕");
+				console.log(filePathStr+"保存完毕 => " + filePathStr);
 			})
-			console.log(orgHref + " => " + filePathStr);
 		}else{
-			console.log(orgHref + " => " + filePathStr+"已存在");
+			console.log(orgHref + " => " + filePathStr+"已存在 => " + filePathStr);
 		}
-
 	}
 	return $;
 }
@@ -176,20 +164,26 @@ function createFolderSync(dirname) {
  * @param endHanddle
  */
 function getTextByUrl(orgiUrlStr, endHanddle){
-	console.log("正在加载"+orgiUrlStr);
 	let orgiUrl = url.parse(orgiUrlStr),
 		httProtocol = (orgiUrl.protocol == 'https:' ? https : http);
 	httProtocol.get( orgiUrlStr, fileGetSuccessHandle);
 
 	function fileGetSuccessHandle(res){
 		let text = ''
+		res.setEncoding('binary');//这一步不可省略
 		res.on('data',function(chunk){
 			text += chunk;
 		})
 		res.on('end',function(){
 			console.log('spider_end && do cb');
-			// console.log(d);
-			endHanddle(orgiUrlStr,text);
+			var $ = cheerio.load(text);
+			var buf = new Buffer(text, 'binary'); //这一步不可省略
+			if(/gbk/i.test($('meta[charset]').attr('charset'))){
+				var str = iconv.decode(buf, 'GBK'); //将GBK编码的字符转换成utf8的
+			}else{//将utf8编码下的binary字符还原为utf8
+				var str = iconv.decode(buf,'UTF8');
+			}
+			endHanddle(orgiUrlStr,str);
 		})
 	}
 }
