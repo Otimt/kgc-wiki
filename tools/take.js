@@ -65,12 +65,14 @@ function countPathByUrl(orgiURL, type) {
 	//文件名
 	let fileName = urlTextArr.pop().replace(/\?.*$/,"");
 	let regex = new RegExp("\." + type + "$");
-	if (type!="img" &&  !fileName.match(regex)){
+	if(type=="html" && fileName==""){
+		fileName = "index.html";
+	}else if (type!="img" &&  !fileName.match(regex)){
 		fileName += "."+type;
 	}
 	console.log(orgiURL+"准备创建文件，文件名："+fileName)
 	let domainStr = urlTextArr.shift();//域名
-	let folder = "../files/" + domainStr + "/" + type + "/" + urlTextArr.join("/");
+	let folder = "../files/" + type + "/" + domainStr + "/" + urlTextArr.join("/");
 
 	let filePathStr = folder + "/" + fileName;
 	return filePathStr;
